@@ -10,16 +10,15 @@ from insightface.app import FaceAnalysis
 class ProfilePicture:
     def __init__(self, img_path: str):
         self.__img_path = img_path
-        self.__img_path_without_extension = os.path.splitext(img_path)[0]
-        self.__img_read = None
+        self.__cv_img_read = None
         self.__face_coordinates = None
 
     def __calc_face_coordinates(self) -> Dict[str, float]:
-        if self.__img_read is None:
-            self.__img_read = cv2.imread(self.__img_path)
+        if self.__cv_img_read is None:
+            self.__cv_img_read = cv2.imread(self.__img_path)
         app = FaceAnalysis(allowed_modules=['detection'])  # enable detection model only
         app.prepare(ctx_id=0, det_size=(640, 640))
-        faces = app.get(self.__img_read)  # get faces from image
+        faces = app.get(self.__cv_img_read)  # get faces from image
         if len(faces) != 1:
             raise Exception("Too many faces")
         return {
@@ -30,9 +29,9 @@ class ProfilePicture:
         }
 
     def __get_image_dimensions(self) -> Dict[str, int]:
-        if self.__img_read is None:
-            self.__img_read = cv2.imread(self.__img_path)
-        [h, w, _] = self.__img_read.shape
+        if self.__cv_img_read is None:
+            self.__cv_img_read = cv2.imread(self.__img_path)
+        [h, w, _] = self.__cv_img_read.shape
         return {'w': w, 'h': h}
 
     def __get_face_dimensions(self) -> Dict[str, float]:
@@ -57,7 +56,7 @@ class ProfilePicture:
         y_append = face_dim['h'] * (1 - height_face_scale) / height_face_scale / 2
         row_begin -= y_append
         row_end += y_append
-        # check if end height or end weight is bigger than the original image
+        # check if end height or end width is bigger than the original image
         real_height = (row_end - row_begin)
         real_width = real_height / height * width
         if real_width > img_dim['w'] or real_height > img_dim['h']:
@@ -84,40 +83,65 @@ class ProfilePicture:
         if col_end > img_dim['w']:
             col_end = img_dim['w']
         # crop and save image
-        if self.__img_read is None:
-            self.__img_read = cv2.imread(self.__img_path)
-        crop = self.__img_read[int(row_begin):int(row_end), int(col_begin):int(col_end)]
+        if self.__cv_img_read is None:
+            self.__cv_img_read = cv2.imread(self.__img_path)
+        crop = self.__cv_img_read[int(row_begin):int(row_end), int(col_begin):int(col_end)]
         cv2.imwrite(target_path, crop)
 
-    def resize_and_convert_jpg_to_webp(self, src_path: str, target_width: int, target_height: int,
-                                       dest_path: str = None):
-        im = Image.open(src_path).convert('RGB')
-        (cropped_width, cropped_height) = im.size
-        if cropped_height > target_height and cropped_width > target_width:
-            im = im.resize((target_width, target_height))
-        if dest_path is None:
-            dest_path = '{0}-ppc-{1}-{2}.webp'.format(self.__img_path_without_extension, target_width, target_height)
-        im.save(dest_path, 'webp')
+    def resize_and_convert(self, src_path: str, dest_path: str, target_width: int, target_height: int,
+                           resize: bool = True, convert: str = None):
+        im = Image.open(src_path)
+        if resize:
+            (cropped_width, cropped_height) = im.size
+            if cropped_height > target_height and cropped_width > target_width:
+                im = im.resize((target_width, target_height))
+        if convert is None:
+            im.save(dest_path)
+        else:
+            im = im.convert('RGB')
+            im.save(dest_path, convert)
 
 
 def init_argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("image_path", help="Path to the image", type=str)
-    parser.add_argument("width", help="Width of the output image in px", type=int)
-    parser.add_argument("height", help="Height of the output image in px", type=int)
-    parser.add_argument("-s", "--scale", help="Size of the face as a percentage of height [0..1]", nargs='?', const=0.5,
-                        type=float)
-    parser.add_argument("-x", "--xfacepos", help="Horizontal face position as a percentage of image width [0..1]",
-                        nargs='?', const=0.5, type=float)
-    parser.add_argument("-y", "--yfacepos", help="Vertical face position as a percentage of image height [0..1]",
-                        nargs='?', const=0.5, type=float)
+    parser.add_argument("width", type=int,
+                        help="In resize mode the width of the output images in px, otherwise the ratio of the output images")
+    parser.add_argument("height", type=int,
+                        help="In convert mode the height of the output images in px, otherwise the ratio of the output images")
+    parser.add_argument("image_paths", nargs="*", type=str, help="Paths to the jpg images")
+    parser.add_argument("-s", "--scale", nargs='?', const=0.5, type=float,
+                        help="Size of the face as a percentage of height [0..1]")
+    parser.add_argument("-x", "--xfacepos", nargs='?', const=0.5, type=float,
+                        help="Horizontal face position as a percentage of image width [0..1]")
+    parser.add_argument("-y", "--yfacepos", nargs='?', const=0.5, type=float,
+                        help="Vertical face position as a percentage of image height [0..1]")
+    parser.add_argument("-f", "--folder_path", type=str, help="Path to a folder where the jpg images are in")
+    parser.add_argument("-c", "--convert", type=str, help="Converts images to the given file format")
+    parser.add_argument("--no_resize", action='store_true',
+                        help="Keeps the aspect ratio given in width and height without resizing the image")
     return parser.parse_args()
 
 
 if __name__ == '__main__':
     args = init_argparser()
-    ppc = ProfilePicture(args.image_path)
-    crop_image_path = args.image_path + '.tmp.jpg'
-    ppc.crop_image(crop_image_path, args.width, args.height, args.scale, args.xfacepos, args.yfacepos)
-    ppc.resize_and_convert_jpg_to_webp(crop_image_path, args.width, args.height)
-    os.remove(crop_image_path)  # remove temporary file
+    image_paths = args.image_paths
+    if args.folder_path:
+        for f in os.listdir(args.folder_path):
+            if f.endswith('.jpg'):
+                image_paths.append(args.folder_path + '/' + f)
+    file_path_template = '{0}-ppc-{1}-{2}.{3}'
+    for image_path in image_paths:
+        ppc = ProfilePicture(image_path)
+        crop_image_path = '{0}-ppc.{1}'.format(os.path.splitext(image_path)[0], 'jpg')
+        ppc.crop_image(crop_image_path, args.width, args.height, args.scale, args.xfacepos, args.yfacepos)
+        resize = False if args.no_resize else True
+        if resize is True or args.convert is not None:
+            dest_path = os.path.splitext(image_path)[0] + '-ppc'
+            if resize is True:
+                dest_path += '-' + str(args.width) + '-' + str(args.height)
+            if args.convert is None:
+                dest_path += '.jpg'
+            else:
+                dest_path += '.' + args.convert
+            ppc.resize_and_convert(crop_image_path, dest_path, args.width, args.height, resize, args.convert)
+            os.remove(crop_image_path)  # remove temporary file
