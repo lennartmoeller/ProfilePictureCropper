@@ -1,24 +1,24 @@
 import argparse
 import os
 from typing import Dict
-
 import cv2
+import time
+import logging
 from PIL import Image
 from insightface.app import FaceAnalysis
 
 
 class ProfilePicture:
-    def __init__(self, img_path: str):
+    def __init__(self, img_path: str, model):
         self.__img_path = img_path
         self.__cv_img_read = None
         self.__face_coordinates = None
+        self.__model = model
 
     def __calc_face_coordinates(self) -> Dict[str, float]:
         if self.__cv_img_read is None:
             self.__cv_img_read = cv2.imread(self.__img_path)
-        app = FaceAnalysis(allowed_modules=['detection'])  # enable detection model only
-        app.prepare(ctx_id=0, det_size=(640, 640))
-        faces = app.get(self.__cv_img_read)  # get faces from image
+        faces = self.__model.get(self.__cv_img_read)  # get faces from image
         if len(faces) != 1:
             raise Exception("Too many faces")
         return {
@@ -104,9 +104,9 @@ class ProfilePicture:
 
 def init_argparser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("width", type=int,
+    parser.add_argument("--width", type=int,
                         help="In resize mode the width of the output images in px, otherwise the ratio of the output images")
-    parser.add_argument("height", type=int,
+    parser.add_argument("--height", type=int,
                         help="In convert mode the height of the output images in px, otherwise the ratio of the output images")
     parser.add_argument("image_paths", nargs="*", type=str, help="Paths to the jpg images")
     parser.add_argument("-s", "--scale", nargs='?', const=0.5, type=float,
@@ -119,19 +119,29 @@ def init_argparser():
     parser.add_argument("-c", "--convert", type=str, help="Converts images to the given file format")
     parser.add_argument("--no_resize", action='store_true',
                         help="Keeps the aspect ratio given in width and height without resizing the image")
+    parser.add_argument("--model_name", type=str, default='buffalo_m',
+                        help="Choose model which should be used by insightface")
+    parser.add_argument("-v", "--debug", action="store_true", help="Debug output")
     return parser.parse_args()
 
 
 if __name__ == '__main__':
+    start_time = time.time()
     args = init_argparser()
+    level = logging.DEBUG if args.debug else logging.INFO
+    logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=level)
     image_paths = args.image_paths
     if args.folder_path:
-        for f in os.listdir(args.folder_path):
-            if f.endswith('.jpg'):
-                image_paths.append(args.folder_path + '/' + f)
+        for r, _, files in os.walk(args.folder_path):
+            for f in files:
+                if f.endswith('.jpg'):
+                    image_paths.append(f'./{r}/{f}')
     file_path_template = '{0}-ppc-{1}-{2}.{3}'
+    model = FaceAnalysis(name=args.model_name, allowed_modules=['detection'])
+    model.prepare(ctx_id=0, det_size=(640, 640))
     for image_path in image_paths:
-        ppc = ProfilePicture(image_path)
+        logging.debug(f'Process {image_path}')
+        ppc = ProfilePicture(image_path, model)
         crop_image_path = '{0}-ppc.{1}'.format(os.path.splitext(image_path)[0], 'jpg')
         ppc.crop_image(crop_image_path, args.width, args.height, args.scale, args.xfacepos, args.yfacepos)
         resize = False if args.no_resize else True
@@ -145,3 +155,4 @@ if __name__ == '__main__':
                 dest_path += '.' + args.convert
             ppc.resize_and_convert(crop_image_path, dest_path, args.width, args.height, resize, args.convert)
             os.remove(crop_image_path)  # remove temporary file
+    logging.debug(f'Runtime: {(time.time() - start_time)} seconds')

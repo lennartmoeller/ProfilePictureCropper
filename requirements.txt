@@ -1,0 +1,3 @@
+Pillow
+insightface
+onnxruntime==1.8.1
