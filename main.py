@@ -104,23 +104,26 @@ class ProfilePicture:
 
 def init_argparser():
     parser = argparse.ArgumentParser()
+    # positional
+    parser.add_argument("image_paths", nargs="*", type=str,
+                        help="Paths to all jpg images to crop. Is not required if [--folder] is set.")
+    # optional
     parser.add_argument("--width", type=int,
-                        help="In resize mode the width of the output images in px, otherwise the ratio of the output images")
+                        help="The width of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.")
     parser.add_argument("--height", type=int,
-                        help="In convert mode the height of the output images in px, otherwise the ratio of the output images")
-    parser.add_argument("image_paths", nargs="*", type=str, help="Paths to the jpg images")
-    parser.add_argument("-s", "--scale", nargs='?', const=0.5, type=float,
-                        help="Size of the face as a percentage of height [0..1]")
-    parser.add_argument("-x", "--xfacepos", nargs='?', const=0.5, type=float,
+                        help="The height of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.")
+    parser.add_argument("--scale", default=0.35, type=float, help="Size of the face as a percentage of height [0..1]")
+    parser.add_argument("--xfacepos", default=0.5, type=float,
                         help="Horizontal face position as a percentage of image width [0..1]")
-    parser.add_argument("-y", "--yfacepos", nargs='?', const=0.5, type=float,
+    parser.add_argument("--yfacepos", default=0.35, type=float,
                         help="Vertical face position as a percentage of image height [0..1]")
-    parser.add_argument("-f", "--folder_path", type=str, help="Path to a folder where the jpg images are in")
-    parser.add_argument("-c", "--convert", type=str, help="Converts images to the given file format")
-    parser.add_argument("--no_resize", action='store_true',
-                        help="Keeps the aspect ratio given in width and height without resizing the image")
+    parser.add_argument("--folder_path", type=str, help="Path to a folder where the jpg images are in")
+    parser.add_argument("--convert", type=str, help="Converts images to the given file format")
     parser.add_argument("--model_name", type=str, default='buffalo_m',
                         help="Choose model which should be used by insightface")
+    # flags
+    parser.add_argument("--no_resize", action='store_true',
+                        help="Keeps the aspect ratio given in width and height without resizing the image")
     parser.add_argument("-v", "--debug", action="store_true", help="Debug output")
     return parser.parse_args()
 
