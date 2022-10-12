@@ -143,23 +143,24 @@ if __name__ == '__main__':
             for f in files:
                 if f.endswith('.jpg'):
                     image_paths.append(f'./{r}/{f}')
-    file_path_template = '{0}-ppc-{1}-{2}.{3}'
     model = FaceAnalysis(name=args.model_name, allowed_modules=['detection'])
     model.prepare(ctx_id=0, det_size=(640, 640))
     for image_path in image_paths:
         logging.debug(f'Process {image_path}')
         ppc = ProfilePicture(image_path, model)
         crop_image_path = '{0}-ppc.{1}'.format(os.path.splitext(image_path)[0], 'jpg')
-        ppc.crop_image(crop_image_path, args.width, args.height, args.scale, args.xfacepos, args.yfacepos)
+        width = args.width if args.width is not None else cv2.imread(image_path).shape[1]
+        height = args.height if args.height is not None else cv2.imread(image_path).shape[0]
+        ppc.crop_image(crop_image_path, width, height, args.scale, args.xfacepos, args.yfacepos)
         resize = False if args.no_resize else True
         if resize is True or args.convert is not None:
             dest_path = os.path.splitext(image_path)[0] + '-ppc'
             if resize is True:
-                dest_path += '-' + str(args.width) + '-' + str(args.height)
+                dest_path += '-{0}-{1}'.format(width, height)
             if args.convert is None:
                 dest_path += '.jpg'
             else:
                 dest_path += '.' + args.convert
-            ppc.resize_and_convert(crop_image_path, dest_path, args.width, args.height, resize, args.convert)
+            ppc.resize_and_convert(crop_image_path, dest_path, width, height, resize, args.convert)
             os.remove(crop_image_path)  # remove temporary file
     logging.debug(f'Runtime: {(time.time() - start_time)} seconds')
