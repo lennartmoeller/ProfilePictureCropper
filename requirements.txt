@@ -1,3 +1,4 @@
-Pillow
-insightface
+Pillow~=9.2.0
+insightface~=0.6.2
 onnxruntime==1.12.1
+numpy==1.23.3

@@ -4,9 +4,8 @@ import os
 import sys
 import time
 from contextlib import contextmanager
-from typing import Dict
 
-import cv2
+import numpy
 from PIL import Image
 from insightface.app import FaceAnalysis
 
@@ -27,59 +26,48 @@ def suppress_stdout_without_verbose(debug: bool):
 
 class ProfilePicture:
     def __init__(self, img_path: str, model: FaceAnalysis):
-        self.__img_path = img_path
-        self.__cv_img_read = None
-        self.__face_coordinates = None
         self.__model = model
+        self.__init_image(img_path)
+        self.__face = None
 
-    def __calc_face_coordinates(self) -> Dict[str, float]:
-        if self.__cv_img_read is None:
-            self.__cv_img_read = cv2.imread(self.__img_path)
-        faces = self.__model.get(self.__cv_img_read)  # get faces from image
+    def __init_image(self, img_path):
+        self.__image = Image.open(img_path)
+        (self.width, self.height) = self.__image.size
+
+    def __init_face(self):
+        faces = self.__model.get(numpy.asarray(self.__image))  # get faces from image
         if len(faces) != 1:
             raise Exception('Too many faces')
-        return {
+        self.__face = {
             'x1': faces[0].bbox[0],
             'y1': faces[0].bbox[1],
             'x2': faces[0].bbox[2],
-            'y2': faces[0].bbox[3]
-        }
-
-    def __get_image_dimensions(self) -> Dict[str, int]:
-        if self.__cv_img_read is None:
-            self.__cv_img_read = cv2.imread(self.__img_path)
-        [h, w, _] = self.__cv_img_read.shape
-        return {'w': w, 'h': h}
-
-    def __get_face_dimensions(self) -> Dict[str, float]:
-        if self.__face_coordinates is None:
-            self.__face_coordinates = self.__calc_face_coordinates()
-        return {
-            'w': self.__face_coordinates['x2'] - self.__face_coordinates['x1'],
-            'h': self.__face_coordinates['y2'] - self.__face_coordinates['y1']
+            'y2': faces[0].bbox[3],
+            'w': faces[0].bbox[2] - faces[0].bbox[0],
+            'h': faces[0].bbox[3] - faces[0].bbox[1]
         }
 
     def crop_image(self, target_path: str, width: int, height: int, height_face_scale: float = 0.5,
                    x_face_pos: float = 0.5,
                    y_face_pos: float = 0.5):
-        face_dim = self.__get_face_dimensions()
-        img_dim = self.__get_image_dimensions()
+        if self.__face is None:
+            self.__init_face()
         # initially set the crop coordinates
-        row_begin = self.__face_coordinates['y1']
-        row_end = self.__face_coordinates['y2']
-        col_begin = self.__face_coordinates['x1']
-        col_end = self.__face_coordinates['x2']
+        row_begin = self.__face['y1']
+        row_end = self.__face['y2']
+        col_begin = self.__face['x1']
+        col_end = self.__face['x2']
         # add margin above and under image to match the height_face_scale
-        y_append = face_dim['h'] * (1 - height_face_scale) / height_face_scale / 2
+        y_append = self.__face['h'] * (1 - height_face_scale) / height_face_scale / 2
         row_begin -= y_append
         row_end += y_append
         # check if end height or end width is bigger than the original image
         real_height = (row_end - row_begin)
         real_width = real_height / height * width
-        if real_width > img_dim['w'] or real_height > img_dim['h']:
+        if real_width > self.width or real_height > self.height:
             raise Exception('Cropped image size bigger than original image size')
         # add margin left and right to the image to match the ratio
-        x_append = (real_width - face_dim['w']) / 2
+        x_append = (real_width - self.__face['w']) / 2
         col_begin -= x_append
         col_end += x_append
         # shift the image in y direction to match the y_face_pos
@@ -95,17 +83,15 @@ class ProfilePicture:
             row_begin = 0
         if col_begin < 0:
             col_begin = 0
-        if row_end > img_dim['h']:
-            row_end = img_dim['h']
-        if col_end > img_dim['w']:
-            col_end = img_dim['w']
+        if row_end > self.height:
+            row_end = self.height
+        if col_end > self.width:
+            col_end = self.width
         # crop and save image
-        if self.__cv_img_read is None:
-            self.__cv_img_read = cv2.imread(self.__img_path)
-        crop = self.__cv_img_read[int(row_begin):int(row_end), int(col_begin):int(col_end)]
+        crop = self.__image.crop((int(col_begin), int(row_begin), int(col_end), int(row_end)))
         if os.path.exists(target_path):
             os.remove(target_path)
-        cv2.imwrite(target_path, crop)
+        crop.save(target_path)
 
     def resize_and_convert(self, src_path: str, dest_path: str, target_width: int, target_height: int,
                            resize: bool = True, convert: str = None):
@@ -167,8 +153,8 @@ if __name__ == '__main__':
         logging.debug(f'Process {image_path}')
         ppc = ProfilePicture(image_path, model)
         crop_image_path = f'{os.path.splitext(image_path)[0]}-ppc.jpg'
-        width = args.width if args.width is not None else cv2.imread(image_path).shape[1]
-        height = args.height if args.height is not None else cv2.imread(image_path).shape[0]
+        width = args.width if args.width is not None else ppc.width
+        height = args.height if args.height is not None else ppc.height
         ppc.crop_image(crop_image_path, width, height, args.scale, args.xfacepos, args.yfacepos)
         resize = False if args.no_resize else True
         if resize is True or args.convert is not None:
