@@ -12,7 +12,7 @@ from insightface.app import FaceAnalysis
 
 
 @contextmanager
-def suppress_stdout_on_debug(debug: bool):
+def suppress_stdout_without_verbose(debug: bool):
     with open(os.devnull, "w") as devnull:
         if debug:
             yield
@@ -26,7 +26,7 @@ def suppress_stdout_on_debug(debug: bool):
 
 
 class ProfilePicture:
-    def __init__(self, img_path: str, model):
+    def __init__(self, img_path: str, model: FaceAnalysis):
         self.__img_path = img_path
         self.__cv_img_read = None
         self.__face_coordinates = None
@@ -152,7 +152,7 @@ def init_argparser():
 if __name__ == '__main__':
     start_time = time.time()
     args = init_argparser()
-    level = logging.DEBUG if args.debug else logging.INFO
+    level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', datefmt='%Y-%m-%d %H:%M:%S', level=level)
     image_paths = args.image_paths
     if args.folder_path:
@@ -160,7 +160,7 @@ if __name__ == '__main__':
             for f in files:
                 if f.endswith('.jpg'):
                     image_paths.append(f'./{r}/{f}')
-    with suppress_stdout_on_debug(args.debug):
+    with suppress_stdout_without_verbose(args.verbose):
         model = FaceAnalysis(root="./insightface", name=args.model_name, allowed_modules=['detection'])
         model.prepare(ctx_id=0, det_size=(640, 640))
     for image_path in image_paths:
