@@ -29,8 +29,11 @@ class ProfilePicture:
         self.__face = None
         self.__image = Image.open(path)
         self.__model = model
-        self.__dest_path = f'{os.path.splitext(path)[0]}-ppc'
         (self.width, self.height) = self.__image.size
+        dest_dir = f'{os.path.dirname(path)}/ppc'
+        if not os.path.exists(dest_dir):
+            os.makedirs(dest_dir)
+        self.__dest_path = f'{dest_dir}/{os.path.splitext(os.path.basename(path))[0]}-ppc'
 
     def __init_face(self):
         faces = self.__model.get(numpy.asarray(self.__image))  # get faces from image
