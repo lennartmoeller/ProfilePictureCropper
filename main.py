@@ -1,9 +1,10 @@
 import argparse
-import os
-from typing import Dict
-import cv2
-import time
 import logging
+import os
+import time
+from typing import Dict
+
+import cv2
 from PIL import Image
 from insightface.app import FaceAnalysis
 
@@ -20,7 +21,7 @@ class ProfilePicture:
             self.__cv_img_read = cv2.imread(self.__img_path)
         faces = self.__model.get(self.__cv_img_read)  # get faces from image
         if len(faces) != 1:
-            raise Exception("Too many faces")
+            raise Exception('Too many faces')
         return {
             'x1': faces[0].bbox[0],
             'y1': faces[0].bbox[1],
@@ -109,26 +110,26 @@ class ProfilePicture:
 def init_argparser():
     parser = argparse.ArgumentParser()
     # positional
-    parser.add_argument("image_paths", nargs="*", type=str,
-                        help="Paths to all jpg images to crop. Is not required if [--folder] is set.")
+    parser.add_argument('image_paths', nargs='*', type=str,
+                        help='Paths to all jpg images to crop. Is not required if [--folder] is set.')
     # optional
-    parser.add_argument("--width", type=int,
-                        help="The width of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.")
-    parser.add_argument("--height", type=int,
-                        help="The height of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.")
-    parser.add_argument("--scale", default=0.35, type=float, help="Size of the face as a percentage of height [0..1]")
-    parser.add_argument("--xfacepos", default=0.5, type=float,
-                        help="Horizontal face position as a percentage of image width [0..1]")
-    parser.add_argument("--yfacepos", default=0.35, type=float,
-                        help="Vertical face position as a percentage of image height [0..1]")
-    parser.add_argument("--folder_path", type=str, help="Path to a folder where the jpg images are in")
-    parser.add_argument("--convert", type=str, help="Converts images to the given file format")
-    parser.add_argument("--model_name", type=str, default='buffalo_m',
-                        help="Choose model which should be used by insightface")
+    parser.add_argument('--width', type=int,
+                        help='The width of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.')
+    parser.add_argument('--height', type=int,
+                        help='The height of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.')
+    parser.add_argument('--scale', default=0.35, type=float, help='Size of the face as a percentage of height [0..1]')
+    parser.add_argument('--xfacepos', default=0.5, type=float,
+                        help='Horizontal face position as a percentage of image width [0..1]')
+    parser.add_argument('--yfacepos', default=0.35, type=float,
+                        help='Vertical face position as a percentage of image height [0..1]')
+    parser.add_argument('--folder_path', type=str, help='Path to a folder where the jpg images are in')
+    parser.add_argument('--convert', type=str, help='Converts images to the given file format')
+    parser.add_argument('--model_name', type=str, default='buffalo_m',
+                        help='Choose model which should be used by insightface')
     # flags
-    parser.add_argument("--no_resize", action='store_true',
-                        help="Keeps the aspect ratio given in width and height without resizing the image")
-    parser.add_argument("-v", "--debug", action="store_true", help="Debug output")
+    parser.add_argument('--no_resize', action='store_true',
+                        help='Keeps the aspect ratio given in width and height without resizing the image')
+    parser.add_argument('-v', '--debug', action='store_true', help='Debug output')
     return parser.parse_args()
 
 
@@ -148,7 +149,7 @@ if __name__ == '__main__':
     for image_path in image_paths:
         logging.debug(f'Process {image_path}')
         ppc = ProfilePicture(image_path, model)
-        crop_image_path = '{0}-ppc.{1}'.format(os.path.splitext(image_path)[0], 'jpg')
+        crop_image_path = f'{os.path.splitext(image_path)[0]}-ppc.jpg'
         width = args.width if args.width is not None else cv2.imread(image_path).shape[1]
         height = args.height if args.height is not None else cv2.imread(image_path).shape[0]
         ppc.crop_image(crop_image_path, width, height, args.scale, args.xfacepos, args.yfacepos)
@@ -156,7 +157,7 @@ if __name__ == '__main__':
         if resize is True or args.convert is not None:
             dest_path = os.path.splitext(image_path)[0] + '-ppc'
             if resize is True:
-                dest_path += '-{0}-{1}'.format(width, height)
+                dest_path += f'-{width}-{height}'
             if args.convert is None:
                 dest_path += '.jpg'
             else:
