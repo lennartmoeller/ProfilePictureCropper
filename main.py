@@ -25,13 +25,11 @@ def suppress_stdout_without_verbose(debug: bool):
 
 
 class ProfilePicture:
-    def __init__(self, img_path: str, model: FaceAnalysis):
-        self.__model = model
-        self.__init_image(img_path)
+    def __init__(self, path: str, model: FaceAnalysis):
         self.__face = None
-
-    def __init_image(self, img_path):
-        self.__image = Image.open(img_path)
+        self.__image = Image.open(path)
+        self.__model = model
+        self.__path = path
         (self.width, self.height) = self.__image.size
 
     def __init_face(self):
@@ -47,9 +45,8 @@ class ProfilePicture:
             'h': faces[0].bbox[3] - faces[0].bbox[1]
         }
 
-    def crop_image(self, target_path: str, width: int, height: int, height_face_scale: float = 0.5,
-                   x_face_pos: float = 0.5,
-                   y_face_pos: float = 0.5):
+    def crop_image(self, width: int = 600, height: int = 900, height_face_scale: float = 0.35, x_face_pos: float = 0.5,
+                   y_face_pos: float = 0.35):
         if self.__face is None:
             self.__init_face()
         # initially set the crop coordinates
@@ -87,26 +84,29 @@ class ProfilePicture:
             row_end = self.height
         if col_end > self.width:
             col_end = self.width
-        # crop and save image
-        crop = self.__image.crop((int(col_begin), int(row_begin), int(col_end), int(row_end)))
-        if os.path.exists(target_path):
-            os.remove(target_path)
-        crop.save(target_path)
+        # reset props, crop and save image
+        self.__image = self.__image.crop((int(col_begin), int(row_begin), int(col_end), int(row_end)))
+        self.__path = f'{os.path.splitext(self.__path)[0]}-ppc.jpg'
+        if os.path.exists(self.__path):
+            os.remove(self.__path)
+        self.__image.save(self.__path)  # TODO It is stupid to save it if it will get converted or resized
+        self.width = real_width
+        self.height = real_height
 
-    def resize_and_convert(self, src_path: str, dest_path: str, target_width: int, target_height: int,
-                           resize: bool = True, convert: str = None):
-        im = Image.open(src_path)
-        if resize:
-            (cropped_width, cropped_height) = im.size
-            if cropped_height > target_height and cropped_width > target_width:
-                im = im.resize((target_width, target_height))
-        if os.path.exists(dest_path):
-            os.remove(dest_path)
-        if convert is None:
-            im.save(dest_path)
-        else:
-            im = im.convert('RGB')
-            im.save(dest_path, convert)
+    def resize_and_convert(self, width: int, height: int, resize: bool = True, convert: str = 'jpg'):
+        os.remove(self.__path)  # remove temporary file  # TODO also remove this when fixing above todo
+        self.__path = os.path.splitext(self.__path)[0]
+        if resize and self.height > height and self.width > width:
+            self.__image = self.__image.resize((width, height))
+            self.__path += f'-{width}-{height}'
+            self.width = width
+            self.height = height
+        if convert is not None:
+            self.__image = self.__image.convert('RGB')
+        self.__path += f'.{convert}'
+        if os.path.exists(self.__path):
+            os.remove(self.__path)
+        self.__image.save(self.__path, convert if convert != 'jpg' else None)
 
 
 def init_argparser():
@@ -125,7 +125,8 @@ def init_argparser():
     parser.add_argument('--yfacepos', default=0.35, type=float,
                         help='Vertical face position as a percentage of image height [0..1]')
     parser.add_argument('--folder_path', type=str, help='Path to a folder where the jpg images are in')
-    parser.add_argument('--convert', type=str, help='Converts images to the given file format')
+    parser.add_argument('--convert', type=str, default='jpg',
+                        help='Converts images to the given file format')  # TODO also support other file extensions (?)
     parser.add_argument('--model_name', type=str, default='buffalo_sc',
                         help='Choose model which should be used by insightface')
     # flags
@@ -152,19 +153,10 @@ if __name__ == '__main__':
     for image_path in image_paths:
         logging.debug(f'Process {image_path}')
         ppc = ProfilePicture(image_path, model)
-        crop_image_path = f'{os.path.splitext(image_path)[0]}-ppc.jpg'
         width = args.width if args.width is not None else ppc.width
         height = args.height if args.height is not None else ppc.height
-        ppc.crop_image(crop_image_path, width, height, args.scale, args.xfacepos, args.yfacepos)
+        ppc.crop_image(width, height, args.scale, args.xfacepos, args.yfacepos)
         resize = False if args.no_resize else True
-        if resize is True or args.convert is not None:
-            dest_path = f'{os.path.splitext(image_path)[0]}-ppc'
-            if resize is True:
-                dest_path += f'-{width}-{height}'
-            if args.convert is None:
-                dest_path += '.jpg'
-            else:
-                dest_path += f'.{args.convert}'
-            ppc.resize_and_convert(crop_image_path, dest_path, width, height, resize, args.convert)
-            os.remove(crop_image_path)  # remove temporary file
+        if resize is True or args.convert != 'jpg':
+            ppc.resize_and_convert(width, height, resize, args.convert)
     logging.debug(f'Runtime: {(time.time() - start_time)} seconds')
