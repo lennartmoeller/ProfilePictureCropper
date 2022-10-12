@@ -29,7 +29,7 @@ class ProfilePicture:
         self.__face = None
         self.__image = Image.open(path)
         self.__model = model
-        self.__path = path
+        self.__dest_path = f'{os.path.splitext(path)[0]}-ppc'
         (self.width, self.height) = self.__image.size
 
     def __init_face(self):
@@ -45,8 +45,8 @@ class ProfilePicture:
             'h': faces[0].bbox[3] - faces[0].bbox[1]
         }
 
-    def crop_image(self, width: int = 600, height: int = 900, height_face_scale: float = 0.35, x_face_pos: float = 0.5,
-                   y_face_pos: float = 0.35):
+    def crop(self, width: int = 2, height: int = 3, height_face_scale: float = 0.35, x_face_pos: float = 0.5,
+             y_face_pos: float = 0.35):
         if self.__face is None:
             self.__init_face()
         # initially set the crop coordinates
@@ -59,12 +59,12 @@ class ProfilePicture:
         row_begin -= y_append
         row_end += y_append
         # check if end height or end width is bigger than the original image
-        real_height = (row_end - row_begin)
-        real_width = real_height / height * width
-        if real_width > self.width or real_height > self.height:
+        dest_height = (row_end - row_begin)
+        dest_width = dest_height / height * width
+        if dest_width > self.width or dest_height > self.height:
             raise Exception('Cropped image size bigger than original image size')
         # add margin left and right to the image to match the ratio
-        x_append = (real_width - self.__face['w']) / 2
+        x_append = (dest_width - self.__face['w']) / 2
         col_begin -= x_append
         col_end += x_append
         # shift the image in y direction to match the y_face_pos
@@ -84,29 +84,25 @@ class ProfilePicture:
             row_end = self.height
         if col_end > self.width:
             col_end = self.width
-        # reset props, crop and save image
+        # reset props, crop image
         self.__image = self.__image.crop((int(col_begin), int(row_begin), int(col_end), int(row_end)))
-        self.__path = f'{os.path.splitext(self.__path)[0]}-ppc.jpg'
-        if os.path.exists(self.__path):
-            os.remove(self.__path)
-        self.__image.save(self.__path)  # TODO It is stupid to save it if it will get converted or resized
-        self.width = real_width
-        self.height = real_height
+        self.width = dest_width
+        self.height = dest_height
 
-    def resize_and_convert(self, width: int, height: int, resize: bool = True, convert: str = 'jpg'):
-        os.remove(self.__path)  # remove temporary file  # TODO also remove this when fixing above todo
-        self.__path = os.path.splitext(self.__path)[0]
-        if resize and self.height > height and self.width > width:
+    def resize(self, width: int = 600, height: int = 900):
+        if self.height > height and self.width > width:
             self.__image = self.__image.resize((width, height))
-            self.__path += f'-{width}-{height}'
+            self.__dest_path += f'-{width}-{height}'
             self.width = width
             self.height = height
-        if convert is not None:
+
+    def finalize(self, convert: str = 'jpg'):
+        if convert != 'jpg':
             self.__image = self.__image.convert('RGB')
-        self.__path += f'.{convert}'
-        if os.path.exists(self.__path):
-            os.remove(self.__path)
-        self.__image.save(self.__path, convert if convert != 'jpg' else None)
+        self.__dest_path += f'.{convert}'
+        if os.path.exists(self.__dest_path):
+            os.remove(self.__dest_path)
+        self.__image.save(self.__dest_path, convert if convert != 'jpg' else None)
 
 
 def init_argparser():
@@ -116,9 +112,9 @@ def init_argparser():
                         help='Paths to all jpg images to crop. Is not required if [--folder] is set.')
     # optional
     parser.add_argument('--width', type=int,
-                        help='The width of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.')
+                        help='The width of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images. If no width or no height is set, the ratio of the original image is used.')
     parser.add_argument('--height', type=int,
-                        help='The height of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images.')
+                        help='The height of the output images in px. If [--no-resize] is set, height and width are the ratio of the cropped images. If no width or no height is set, the ratio of the original image is used.')
     parser.add_argument('--scale', default=0.35, type=float, help='Size of the face as a percentage of height [0..1]')
     parser.add_argument('--xfacepos', default=0.5, type=float,
                         help='Horizontal face position as a percentage of image width [0..1]')
@@ -126,7 +122,7 @@ def init_argparser():
                         help='Vertical face position as a percentage of image height [0..1]')
     parser.add_argument('--folder_path', type=str, help='Path to a folder where the jpg images are in')
     parser.add_argument('--convert', type=str, default='jpg',
-                        help='Converts images to the given file format')  # TODO also support other file extensions (?)
+                        help='Converts images to the given file format')
     parser.add_argument('--model_name', type=str, default='buffalo_sc',
                         help='Choose model which should be used by insightface')
     # flags
@@ -151,12 +147,14 @@ if __name__ == '__main__':
         model = FaceAnalysis(root="./insightface", name=args.model_name, allowed_modules=['detection'])
         model.prepare(ctx_id=0, det_size=(640, 640))
     for image_path in image_paths:
-        logging.debug(f'Process {image_path}')
+        logging.debug(f' Process {image_path}')
         ppc = ProfilePicture(image_path, model)
-        width = args.width if args.width is not None else ppc.width
-        height = args.height if args.height is not None else ppc.height
-        ppc.crop_image(width, height, args.scale, args.xfacepos, args.yfacepos)
-        resize = False if args.no_resize else True
-        if resize is True or args.convert != 'jpg':
-            ppc.resize_and_convert(width, height, resize, args.convert)
-    logging.debug(f'Runtime: {(time.time() - start_time)} seconds')
+        if args.width is None or args.height is None:
+            args.width = ppc.width
+            args.height = ppc.height
+            args.no_resize = True
+        ppc.crop(args.width, args.height, args.scale, args.xfacepos, args.yfacepos)
+        if not args.no_resize:
+            ppc.resize(args.width, args.height)
+        ppc.finalize(args.convert)
+    logging.debug(f' Runtime: {(time.time() - start_time)} seconds')
