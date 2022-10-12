@@ -124,7 +124,7 @@ def init_argparser():
                         help='Vertical face position as a percentage of image height [0..1]')
     parser.add_argument('--folder_path', type=str, help='Path to a folder where the jpg images are in')
     parser.add_argument('--convert', type=str, help='Converts images to the given file format')
-    parser.add_argument('--model_name', type=str, default='buffalo_m',
+    parser.add_argument('--model_name', type=str, default='buffalo_sc',
                         help='Choose model which should be used by insightface')
     # flags
     parser.add_argument('--no_resize', action='store_true',
@@ -144,7 +144,7 @@ if __name__ == '__main__':
             for f in files:
                 if f.endswith('.jpg'):
                     image_paths.append(f'./{r}/{f}')
-    model = FaceAnalysis(name=args.model_name, allowed_modules=['detection'])
+    model = FaceAnalysis(root="./insightface", name=args.model_name, allowed_modules=['detection'])
     model.prepare(ctx_id=0, det_size=(640, 640))
     for image_path in image_paths:
         logging.debug(f'Process {image_path}')
@@ -155,13 +155,13 @@ if __name__ == '__main__':
         ppc.crop_image(crop_image_path, width, height, args.scale, args.xfacepos, args.yfacepos)
         resize = False if args.no_resize else True
         if resize is True or args.convert is not None:
-            dest_path = os.path.splitext(image_path)[0] + '-ppc'
+            dest_path = f'{os.path.splitext(image_path)[0]}-ppc'
             if resize is True:
                 dest_path += f'-{width}-{height}'
             if args.convert is None:
                 dest_path += '.jpg'
             else:
-                dest_path += '.' + args.convert
+                dest_path += f'.{args.convert}'
             ppc.resize_and_convert(crop_image_path, dest_path, width, height, resize, args.convert)
             os.remove(crop_image_path)  # remove temporary file
     logging.debug(f'Runtime: {(time.time() - start_time)} seconds')
