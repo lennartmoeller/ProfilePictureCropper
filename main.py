@@ -86,6 +86,8 @@ class ProfilePicture:
         if self.__cv_img_read is None:
             self.__cv_img_read = cv2.imread(self.__img_path)
         crop = self.__cv_img_read[int(row_begin):int(row_end), int(col_begin):int(col_end)]
+        if os.path.exists(target_path):
+            os.remove(target_path)
         cv2.imwrite(target_path, crop)
 
     def resize_and_convert(self, src_path: str, dest_path: str, target_width: int, target_height: int,
@@ -95,6 +97,8 @@ class ProfilePicture:
             (cropped_width, cropped_height) = im.size
             if cropped_height > target_height and cropped_width > target_width:
                 im = im.resize((target_width, target_height))
+        if os.path.exists(dest_path):
+            os.remove(dest_path)
         if convert is None:
             im.save(dest_path)
         else:
