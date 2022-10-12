@@ -18,15 +18,24 @@ class ProfilePicture:
 
     def __init_face(self):
         faces = self.__model.get(numpy.asarray(self.__image))  # get faces from image
-        if len(faces) != 1:
-            raise Exception('Too many faces')
+        # Image.fromarray(self.__model.draw_on(numpy.asarray(self.__image), faces)).save(self.__dest_path + '-face.jpg')
+        if len(faces) == 0:
+            raise Exception('No face detected...')
+        area = lambda e: (e.bbox[2] - e.bbox[0]) * (e.bbox[3] - e.bbox[1])
+        f = faces[0]
+        for face in faces:
+            if area(f) < area(face):
+                f = face
         self.__face = {
-            'x1': faces[0].bbox[0],
-            'y1': faces[0].bbox[1],
-            'x2': faces[0].bbox[2],
-            'y2': faces[0].bbox[3],
-            'w': faces[0].bbox[2] - faces[0].bbox[0],
-            'h': faces[0].bbox[3] - faces[0].bbox[1]
+            'x1': f.bbox[0],
+            'y1': f.bbox[1],
+            'x2': f.bbox[2],
+            'y2': f.bbox[3],
+            'w': f.bbox[2] - f.bbox[0],
+            'h': f.bbox[3] - f.bbox[1],
+            'eyes': [f.kps[0], f.kps[1]],
+            'nose': f.kps[2],
+            'mouth': [f.kps[3], f.kps[4]]
         }
 
     def crop(self, width: int = 2, height: int = 3, height_face_scale: float = 0.35, x_face_pos: float = 0.5,
