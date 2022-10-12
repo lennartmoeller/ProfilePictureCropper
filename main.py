@@ -1,12 +1,28 @@
 import argparse
 import logging
 import os
+import sys
 import time
+from contextlib import contextmanager
 from typing import Dict
 
 import cv2
 from PIL import Image
 from insightface.app import FaceAnalysis
+
+
+@contextmanager
+def suppress_stdout_on_debug(debug: bool):
+    with open(os.devnull, "w") as devnull:
+        if debug:
+            yield
+        else:
+            old_stdout = sys.stdout
+            sys.stdout = devnull
+            try:
+                yield
+            finally:
+                sys.stdout = old_stdout
 
 
 class ProfilePicture:
@@ -129,7 +145,7 @@ def init_argparser():
     # flags
     parser.add_argument('--no_resize', action='store_true',
                         help='Keeps the aspect ratio given in width and height without resizing the image')
-    parser.add_argument('-v', '--debug', action='store_true', help='Debug output')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Debug output')
     return parser.parse_args()
 
 
@@ -144,8 +160,9 @@ if __name__ == '__main__':
             for f in files:
                 if f.endswith('.jpg'):
                     image_paths.append(f'./{r}/{f}')
-    model = FaceAnalysis(root="./insightface", name=args.model_name, allowed_modules=['detection'])
-    model.prepare(ctx_id=0, det_size=(640, 640))
+    with suppress_stdout_on_debug(args.debug):
+        model = FaceAnalysis(root="./insightface", name=args.model_name, allowed_modules=['detection'])
+        model.prepare(ctx_id=0, det_size=(640, 640))
     for image_path in image_paths:
         logging.debug(f'Process {image_path}')
         ppc = ProfilePicture(image_path, model)
