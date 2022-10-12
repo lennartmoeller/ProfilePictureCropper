@@ -64,7 +64,7 @@ if __name__ == '__main__':
     if args.folder_path:
         for r, _, files in os.walk(args.folder_path):
             for f in files:
-                if f.endswith('.jpg'):
+                if f.endswith('.jpg') and 'ppc' not in f:
                     image_paths.append(f'./{r}/{f}')
     with suppress_stdout_without_verbose(args.verbose):
         model = FaceAnalysis(root="./insightface", name=args.model_name, allowed_modules=['detection'])
