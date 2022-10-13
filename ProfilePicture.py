@@ -109,15 +109,19 @@ class ProfilePicture:
         col_end += x_move
         # move back cropped image if it is above an edge
         if row_begin < 0:
+            row_end -= row_begin
             row_begin = 0
             # TODO log image shifting
         if col_begin < 0:
+            col_end -= col_begin
             col_begin = 0
             # TODO log image shifting
         if row_end > self.height:
+            row_begin -= row_end - self.height
             row_end = self.height
             # TODO log image shifting
         if col_end > self.width:
+            col_begin -= col_end - self.width
             col_end = self.width
             # TODO log image shifting
         # reset props, crop image
