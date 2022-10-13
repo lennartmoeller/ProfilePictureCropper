@@ -51,7 +51,7 @@ def init_argparser():
     # flags
     parser.add_argument('--no_resize', action='store_true',
                         help='Keeps the aspect ratio given in width and height without resizing the image')
-    parser.add_argument('--draw_rectangles', action='store_true')
+    parser.add_argument('--draw_rectangles', action='store_true', help='Highlights the detected face with rectangles')
     parser.add_argument('-v', '--verbose', action='store_true', help='Debug output')
     return parser.parse_args()
 
