@@ -51,6 +51,7 @@ def init_argparser():
     # flags
     parser.add_argument('--no_resize', action='store_true',
                         help='Keeps the aspect ratio given in width and height without resizing the image')
+    parser.add_argument('--draw_rectangles', action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true', help='Debug output')
     return parser.parse_args()
 
@@ -72,6 +73,8 @@ if __name__ == '__main__':
     for image_path in image_paths:
         logging.debug(f' Process {image_path}')
         ppc = ProfilePicture(image_path, model)
+        if args.draw_rectangles:
+            ppc.draw_face_detections()
         if args.width is None or args.height is None:
             args.width = ppc.width
             args.height = ppc.height
